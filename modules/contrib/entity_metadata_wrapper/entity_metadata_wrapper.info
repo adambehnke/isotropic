@@ -1,0 +1,10 @@
+name = Entity Metadata Wrapper
+description = Returns a property wrapper for given data.
+
+backdrop = 1.x
+type = module
+
+; Added by Backdrop CMS packaging script on 2017-10-09
+project = entity_metadata_wrapper
+version = 1.x-1.0.2
+timestamp = 1507582089

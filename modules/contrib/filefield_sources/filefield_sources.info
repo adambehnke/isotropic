@@ -1,0 +1,11 @@
+name = File Field Sources
+description = Extends File fields to allow referencing of existing files, remote files, and server files.
+dependencies[] = file
+package = Fields
+backdrop = 1.x
+type = module
+
+; Added by Backdrop CMS packaging script on 2018-02-07
+project = filefield_sources
+version = 1.x-1.11.0
+timestamp = 1518036704

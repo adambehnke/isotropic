@@ -1,0 +1,6 @@
+name = Isotropic Job Submission Form
+description = Provides a job submission form for use in HFSS.
+package = Isotropic
+core = 7.x
+version = BACKDROP_VERSION
+backdrop = 1.x

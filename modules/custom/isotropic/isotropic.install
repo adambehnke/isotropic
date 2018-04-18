@@ -1,0 +1,22 @@
+<?php
+
+/**
+ * @file
+ * Isotropic job submission form install.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function isotropic_install() {
+  $config = config('isotropic.settings');
+  $config->set('isotropic_checkbox', FALSE);
+  $config->set('isotropic_element_combined', '0000000000');
+  $config->set('isotropic_textfield', '');
+  $config->set('isotropic_element_discrete', array(
+    'areacode' => '999',
+    'prefix' => '999',
+    'extension' => '9999',
+  ));
+  $config->save();
+}

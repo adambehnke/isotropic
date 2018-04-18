@@ -1,0 +1,295 @@
+<?php
+
+/**
+ * @file
+ * Isotropic job submission form module.
+ */
+
+/**
+ * @defgroup isotropic
+ * @ingroup isotropic
+ * @{
+ * Job submission form.
+ *
+ */
+
+#define('SERVER_IP_SMALL', '10.0.1.225');
+#define('SERVER_IP_MEDIUM', '10.0.1.246');
+#define('SERVER_IP_LARGE', '10.0.1.103');
+#define('SERVER_IP', '10.0.1.219');
+
+function isotropic_cron() {
+
+  $files = glob('/shared/files/jobs/logs/*.{log}', GLOB_BRACE);
+  $result = array();
+
+  foreach($files as $file) {
+    $handle = fopen($file, "r");
+    if ($handle) {
+      while (($line = fgets($handle)) !== false) {
+        $e = explode('::', $line);
+        $status = $e[1];
+        $j = explode('/shared/files/jobs/logs/', $file);
+        $k = explode('-', $j[1]);
+        $job = str_replace('.log', '', $k[0]);
+        $result[$job] = $status;
+      }
+      fclose($handle);
+    }
+    else {
+      backdrop_set_message('Failed to open log file.');
+    }
+  }
+
+  #0|Failed
+  #1 - C -  Job is completed after having run/
+  #2 - E -  Job is exiting after having run.
+  #3 - H -  Job is held.
+  #4 - Q -  job is queued, eligible to run or routed.
+  #5 - R -  job is running.
+  #6 - T -  job is being moved to new location.
+  #7 - W -  job is waiting for its execution time
+
+  foreach ($result as $key => $value) {
+    $row = db_query('SELECT nid FROM {node} WHERE title = :mytitle', array(':mytitle' => $key))->fetchField();
+
+    $node = node_load($row);
+
+    switch ($value) {
+      case "F":
+        $statval = 0;
+        break;
+      case "C":
+        $statval = 1;
+        break;
+      case "E":
+        $statval = 2;
+        break;
+      case "H":
+        $statval = 3;
+        break;
+      case "Q":
+        $statval = 4;
+        break;
+      case "R":
+        $statval = 5;
+        break;
+      case "T":
+        $statval = 6;
+        break;
+      case "W":
+        $statval = 7;
+        break;
+      default:
+        $statval = 0;
+        break;
+    }
+    $node->field_job_status[LANGUAGE_NONE][0]['value'] = $statval;
+    node_save($node);
+    //backdrop_set_message(print_r($node,true));
+
+  }
+}
+
+function isotropic_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id == 'job_submission_node_form') {
+    $form['title']['#default_value'] = 'Test' . rand(0,9999);
+  }
+}
+
+/**
+ * Implements hook_config_info().
+ */
+function isotropic_config_info() {
+  $prefixes['isotropic.settings'] = array(
+    'label' => t('Isotropic settings'),
+    'group' => t('Configuration'),
+  );
+  return $prefixes;
+}
+
+/**
+ * Implements hook_menu().
+ *
+ */
+/*
+function isotropic_menu() {
+  $items = array();
+  $items['isotropic'] = array(
+    'title' => 'Isotropic Job Submission',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('form_isotropic_job_submit'),
+    'access callback' => TRUE,
+    'description' => 'Job Submission',
+    'file' => 'isotropic_forms.inc',
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+*/
+
+/**
+ * Page callback for our general info page.
+ */
+function isotropic_intro() {
+  $markup = t('Isotropic');
+  return array('#markup' => $markup);
+}
+
+/**
+ * Implements hook_theme().
+ *
+ * The only theme implementation is by the element example. To keep the various
+ * parts of the example together, this actually returns
+ * _isotropic_element_theme().
+ */
+/*
+function isotropic_theme($existing, $type, $theme, $path) {
+  return _isotropic_element_theme($existing, $type, $theme, $path);
+}
+
+function _isotropic_element_theme() {
+  return array(
+    'form_example_inline_form_element' => array(
+      'render element' => 'element',
+    ),
+    'form_example_checkbox' => array(
+      'render element' => 'element',
+    ),
+  );
+}
+*/
+
+function isotropic_node_insert($node) {
+
+  $submit_job = true;
+  $node->field_job_status[LANGUAGE_NONE]['0']['value'] = 0; // Failed
+
+  $job_result = views_get_view_result('all_job', 'page_1');
+  $job_size = $node->field_csize[LANGUAGE_NONE][0]['value']; // 3 = L
+  /*
+  if (isset($job_result)) {
+    foreach ($job_result as $job_key => $job_value) {
+      if ($job_value->field_field_job_status[0]['raw']['value'] == 1) { // 1 = Running
+        if ($job_value->field_field_csize[0]['raw']['value'] == $job_size) { // Job already submitted to size.
+          backdrop_set_message(t('There is a running job on selected cluster size. Job listed as incomplete.'), 'error');
+          $node->field_job_status[LANGUAGE_NONE]['0']['value'] = 2; // Incomplete
+          $submit_job = false;
+        }
+      }
+    }
+  }
+  */
+
+  if ($submit_job) {
+    backdrop_set_message(t('Will send UDP message to Master to fire off job.'));
+
+    if (isset($node->field_file) && isset($node->field_file['und']) &&
+      isset($node->field_file['und'][0]) && isset($node->field_file['und'][0]['fid'])) {
+
+        $file = file_load($node->field_file['und'][0]['fid']);
+
+        $job_submitted = false;
+
+        $job_submitted = isotropic_execute_job(
+          $file->filename,
+          $node->title,
+          $node->field_analysis_setup['und'][0]['value'],
+          $node->field_csize['und'][0]['value'],
+          $node->field_requested_cores['und'][0]['value'],
+          $node->field_requested_tasks['und'][0]['value']);
+
+        if ($job_submitted) {
+          backdrop_set_message(t('Job submit successful.'));
+          $node->field_job_status[LANGUAGE_NONE]['0']['value'] = 1; //Running
+          //dsm($node);
+        }
+    }
+    else {
+        backdrop_set_message(t('File Error.'), 'error');
+        $node->field_job_status[LANGUAGE_NONE]['0']['value'] = 0; //Failed
+    }
+  }
+
+  field_attach_update('node', $node); //Save field updates (e.g. job status)
+
+}
+
+function isotropic_execute_job($filename, $jobname, $analysis, $size, $req_cores, $req_tasks) {
+
+  $term = '';
+  switch ($size) {
+    case 0:
+      $term = taxonomy_term_load(4);
+      //$server = SERVER_IP_SMALL;
+      break;
+    case 1:
+      $term = taxonomy_term_load(1);
+      //$server = SERVER_IP_SMALL;
+      break;
+    case 2:
+      $term = taxonomy_term_load(2);
+      //$server = SERVER_IP_MEDIUM;
+      break;
+    case 3:
+      $term = taxonomy_term_load(3);
+      //$server = SERVER_IP_LARGE;
+      break;
+    default:
+      $term = taxonomy_term_load(1);
+      //$server = SERVER_IP;
+      break;
+  }
+  $server = $term->field_masterip[LANGUAGE_NONE][0]['value'];
+  $port = 9999;
+
+  backdrop_set_message("Sending to cluster size: " . $size . " at " . $server);
+
+  if(!($sock = socket_create(AF_INET, SOCK_DGRAM, 0)))
+  {
+      $errorcode = socket_last_error();
+      $errormsg = socket_strerror($errorcode);
+
+      backdrop_set_message("Couldn't create socket: [$errorcode] $errormsg \n", 'error');
+      return false;
+  }
+
+  socket_set_option ( $sock, SOL_SOCKET, SO_SNDTIMEO, array("sec"=>5, "usec"=>0 ));
+  socket_set_option ( $sock, SOL_SOCKET, SO_RCVTIMEO, array("sec"=>5, "usec"=>0 ));
+
+  backdrop_set_message("Socket created \n");
+
+  //Take some input to send
+  $input = $filename . '~~~~' . $jobname . '~~~~' . $analysis . '~~~~' . $size . '~~~~' . $req_cores . '~~~~' . $req_tasks;
+
+  backdrop_set_message($input);
+
+  //Send the message to the server
+  if( ! socket_sendto($sock, $input , strlen($input) , 0 , $server , $port))
+  {
+    $errorcode = socket_last_error();
+    $errormsg = socket_strerror($errorcode);
+
+    backdrop_set_message("Could not send data: [$errorcode] $errormsg \n", 'error');
+    return false;
+  }
+
+  //Now receive reply from server and print it
+  if(socket_recv ( $sock , $reply , 2045 , MSG_WAITALL ) === FALSE)
+  {
+    $errorcode = socket_last_error();
+    $errormsg = socket_strerror($errorcode);
+
+    backdrop_set_message("Could not receive data: [$errorcode] $errormsg \n", 'error');
+    return false;
+  }
+
+  backdrop_set_message("Reply from server: $reply");
+  return true;
+
+}
+
+/**
+ * @} End of "defgroup isotropic".
+ */

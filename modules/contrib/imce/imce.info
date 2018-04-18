@@ -1,0 +1,11 @@
+name = "IMCE"
+description = "An image/file uploader and browser supporting personal directories and user quota."
+backdrop = "1.x"
+package = "Media"
+configure = "admin/config/media/imce"
+type = module
+
+; Added by Backdrop CMS packaging script on 2016-01-25
+project = imce
+version = 1.x-1.0.0
+timestamp = 1453739379
