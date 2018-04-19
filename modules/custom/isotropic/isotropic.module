@@ -18,6 +18,36 @@
 #define('SERVER_IP_LARGE', '10.0.1.103');
 #define('SERVER_IP', '10.0.1.219');
 
+/**
+ * Implements hook_menu().
+ *
+ */
+function isotropic_menu() {
+  $items = array();
+
+  $items['jobconfig/%'] = array(
+    'title' => 'Job Parameter Selection',
+    //'page arguments' => array(1),
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('form_isotropic_job_config', 1),
+    'access callback' => TRUE,
+    'description' => 'Job Parameter Configuration',
+    'file' => 'isotropic_forms.inc',
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Page callback for our general info page.
+ */
+function isotropic_intro() {
+  $markup = t('Isotropic');
+  return array('#markup' => $markup);
+}
+
+
 function isotropic_cron() {
 
   $files = glob('/shared/files/jobs/logs/*.{log}', GLOB_BRACE);
@@ -109,35 +139,6 @@ function isotropic_config_info() {
 }
 
 /**
- * Implements hook_menu().
- *
- */
-/*
-function isotropic_menu() {
-  $items = array();
-  $items['isotropic'] = array(
-    'title' => 'Isotropic Job Submission',
-    'page callback' => 'backdrop_get_form',
-    'page arguments' => array('form_isotropic_job_submit'),
-    'access callback' => TRUE,
-    'description' => 'Job Submission',
-    'file' => 'isotropic_forms.inc',
-    'type' => MENU_NORMAL_ITEM,
-  );
-
-  return $items;
-}
-*/
-
-/**
- * Page callback for our general info page.
- */
-function isotropic_intro() {
-  $markup = t('Isotropic');
-  return array('#markup' => $markup);
-}
-
-/**
  * Implements hook_theme().
  *
  * The only theme implementation is by the element example. To keep the various
@@ -162,13 +163,13 @@ function _isotropic_element_theme() {
 */
 
 function isotropic_node_insert($node) {
-
+  /*
   $submit_job = true;
   $node->field_job_status[LANGUAGE_NONE]['0']['value'] = 0; // Failed
 
   $job_result = views_get_view_result('all_job', 'page_1');
   $job_size = $node->field_csize[LANGUAGE_NONE][0]['value']; // 3 = L
-  /*
+
   if (isset($job_result)) {
     foreach ($job_result as $job_key => $job_value) {
       if ($job_value->field_field_job_status[0]['raw']['value'] == 1) { // 1 = Running
@@ -180,7 +181,6 @@ function isotropic_node_insert($node) {
       }
     }
   }
-  */
 
   if ($submit_job) {
     backdrop_set_message(t('Will send UDP message to Master to fire off job.'));
@@ -213,6 +213,9 @@ function isotropic_node_insert($node) {
   }
 
   field_attach_update('node', $node); //Save field updates (e.g. job status)
+  */
+  backdrop_set_message(t('Job saved. Please select parameters on job form.'));
+  backdrop_set_message("<a href='/jobconfig/$node->nid'>Here</a>");
 
 }
 
@@ -222,7 +225,7 @@ function isotropic_execute_job($filename, $jobname, $analysis, $size, $req_cores
   switch ($size) {
     case 0:
       $term = taxonomy_term_load(4);
-      //$server = SERVER_IP_SMALL;
+      //$server = SGE;
       break;
     case 1:
       $term = taxonomy_term_load(1);
